@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: ./docker/app/Dockerfile
+    container_name: app_${APP_NAME}
+    tty: true
+    command: >
+      sh -c
+         'mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache storage/logs bootstrap/cache \
+          && chmod -R 777 storage bootstrap/cache storage \
+          && composer update -o --no-interaction \
+          && composer dump-autoload -o \
+          && php artisan optimize \
+          && php artisan event:cache \
+          && php artisan config:cache \
+          && php artisan route:cache \
+          && php artisan view:cache \
+          && vendor/bin/pint \
+          && npm update \
+          && php artisan octane:start --server=swoole --host=0.0.0.0 --port=9000 --watch'
+    ports:
+      - "${APP_PORT}:9000"
+    volumes:
+      - ./app/:/var/www/html/
+      - ./docker/app/php.ini:/usr/local/etc/php/conf.d/php.ini
+
+  vite-dev-server:
+    image: laravel-inertia-app
+    container_name: vite-dev-server_${APP_NAME}
+    restart: unless-stopped
+    command: >
+      sh -c
+         'npm run dev'
+    ports:
+      - "${VITE_DEV_PORT}:5173"
+    volumes:
+      - ./app/:/var/www/html/
+      - ./docker/app/php.ini:/usr/local/etc/php/conf.d/php.ini
+    depends_on:
+      - app
